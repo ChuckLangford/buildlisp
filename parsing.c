@@ -7,6 +7,10 @@
 
 static char buffer[2048];
 
+/* Notes for me:
+ * cc -std=c99 -Wall parsing.c mpc.c -ledit -lm -o ./out/parsing
+ */
+
 /* Fake readline function */
 char* readline(char* prompt) {
   fputs(prompt, stdout);
@@ -23,6 +27,37 @@ void add_history(char* unused);
 #else
 #include <editline/readline.h>
 #endif
+
+/* User operator string to see which operation to perform */
+long eval_op(long x, char* op, long y) {
+  if(strcmp(op, "+") == 0) { return x + y; }
+  if(strcmp(op, "-") == 0) { return x - y; }
+  if(strcmp(op, "*") == 0) { return x * y; }
+  if(strcmp(op, "/") == 0) { return x / y; }
+  return 0;
+}
+
+long eval(mpc_ast_t* t) {
+  /* If tagged as number, return it directly */
+  if (strstr(t->tag, "number")) {
+    return atoi(t->contents);
+  }
+
+  /* The operator is always second child */
+  char* op = t->children[1]->contents;
+
+  /* We store the third child inside of 'x' */
+  long x = eval(t->children[2]);
+
+  /* Iterate the remaining children and combine */
+  int i = 3;
+  while(strstr(t->children[i]->tag, "expr")) {
+    x = eval_op(x, op, eval(t->children[i]));
+    i++;
+  }
+
+  return x;
+}
 
 int main(int argc, char** argv)
 {
@@ -55,7 +90,9 @@ int main(int argc, char** argv)
     mpc_result_t r;
     if (mpc_parse("<stdin>", input, Lispy, &r)) {
       /* On success print the ast */
-      mpc_ast_print(r.output);
+      /* mpc_ast_print(r.output); */
+      long result = eval(r.output);
+      printf("%li\n", result);
       mpc_ast_delete(r.output);
     } else {
       /* Otherwise print the error */
